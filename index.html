@@ -1,253 +1,88 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Delivery App</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --tg-theme-bg-color: #fff;
-            --tg-theme-text-color: #000;
-            --tg-theme-button-color: #3390ec;
-            --tg-theme-button-text-color: #fff;
-        }
-        body {
-            background-color: var(--tg-theme-bg-color);
-            color: var(--tg-theme-text-color);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            padding-bottom: 80px;
-        }
-        .sidebar {
-            height: 100%;
-            width: 0;
-            position: fixed;
-            z-index: 1000;
-            top: 0;
-            left: 0;
-            background-color: #1c1c1e;
-            overflow-x: hidden;
-            transition: 0.3s;
-            padding-top: 60px;
-        }
-        .sidebar a {
-            padding: 10px 15px;
-            text-decoration: none;
-            font-size: 18px;
-            color: #818181;
-            display: block;
-            transition: 0.3s;
-        }
-        .sidebar a:hover { color: #f1f1f1; }
-        .openbtn {
-            font-size: 20px;
-            cursor: pointer;
-            background-color: transparent;
-            color: var(--tg-theme-text-color);
-            padding: 10px 15px;
-            border: none;
-        }
-        .card-custom {
-            background-color: rgba(128, 128, 128, 0.1);
-            border: none;
-            border-radius: 12px;
-            margin-bottom: 10px;
-        }
-        .status-badge {
-            background-color: var(--tg-theme-button-color);
-            color: var(--tg-theme-button-text-color);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-        /* Скрытие секций */
-        .section { display: none; padding: 15px; }
-        .active-section { display: block; }
-    </style>
-</head>
-<body>
+<script>
+    // 1. ЗАМЕНИ НА СВОЮ ССЫЛКУ С RENDER
+    const API_URL = "https://твой-проект.onrender.com"; 
 
-    <div class="d-flex align-items-center border-bottom p-2">
-        <button class="openbtn" onclick="toggleNav()">☰</button>
-        <span class="ms-2 fw-bold">China Logistics 🇨🇳🇷🇺</span>
-    </div>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
 
-    <div id="mySidebar" class="sidebar">
-        <a href="javascript:void(0)" class="closebtn" onclick="toggleNav()">× Закрыть</a>
-        <a href="#" onclick="showSection('profile')">👤 Профиль</a>
-        <a href="#" onclick="showSection('deliveries')">📦 Мои доставки</a>
-        <a href="https://t.me/telegram" target="_blank">💬 Поддержка</a>
-        
-        <div id="operator-menu" style="display:none;">
-            <hr class="text-white">
-            <p class="text-white ps-3 small">ОПЕРАТОР</p>
-            <a href="#" onclick="showSection('weighing')">⚖️ Взвесить</a>
-        </div>
+    let myUser = null;
 
-        <div id="admin-menu" style="display:none;">
-            <hr class="text-white">
-            <p class="text-white ps-3 small">АДМИН</p>
-            <a href="#" onclick="showSection('admin-settings')">⚙️ Настройки оплаты</a>
-        </div>
-    </div>
+    async function init() {
+        if (!tg.initDataUnsafe.user) return alert("Зайди через бота!");
 
-    <div id="profile" class="section active-section">
-        <h3>Мой профиль</h3>
-        <div class="card-custom p-3">
-            <p><strong>Код клиента:</strong> <span id="user-pcode" class="text-primary fw-bold">Загрузка...</span></p>
-            <div class="mb-3">
-                <label class="form-label">Ваше Имя</label>
-                <input type="text" class="form-control" id="profile-name">
-            </div>
-            <button class="btn btn-primary w-100" onclick="saveProfile()">Сохранить</button>
-        </div>
-    </div>
+        try {
+            const res = await fetch(`${API_URL}/api/auth`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(tg.initDataUnsafe.user)
+            });
+            myUser = await res.json();
 
-    <div id="deliveries" class="section">
-        <h3>Мои посылки</h3>
-        <div id="packages-list">
-            </div>
-    </div>
+            document.getElementById('user-name').innerText = myUser.full_name;
+            document.getElementById('personal-code').innerText = myUser.personal_code;
 
-    <div id="weighing" class="section">
-        <h3>Взвешивание</h3>
-        <div class="card-custom p-3">
-            <div class="mb-3">
-                <label>Код клиента (например USER-1001)</label>
-                <input type="text" class="form-control" id="op-user-code">
-            </div>
-            <div class="mb-3">
-                <label>Вес (кг)</label>
-                <input type="number" class="form-control" id="op-weight" step="0.1">
-            </div>
-            <button class="btn btn-success w-100" onclick="submitWeight()">Рассчитать и Сохранить</button>
-            <div id="weigh-result" class="mt-3 text-success"></div>
-        </div>
-    </div>
-
-    <div id="admin-settings" class="section">
-        <h3>Текст для оплаты</h3>
-        <textarea class="form-control mb-3" id="admin-payment-text" rows="5"></textarea>
-        <button class="btn btn-warning w-100" onclick="savePaymentText()">Обновить информацию</button>
-    </div>
-
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        
-        // Глобальные переменные
-        let currentUser = null;
-        const API_URL = ""; // Пустой, так как на одном домене
-
-        // Инициализация
-        document.addEventListener("DOMContentLoaded", async () => {
-            const user = tg.initDataUnsafe.user;
-            if (user) {
-                // Авторизация на бэке
-                const response = await fetch('/api/auth', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(user)
-                });
-                currentUser = await response.json();
-                
-                // Заполнение профиля
-                document.getElementById('user-pcode').innerText = currentUser.personal_code;
-                document.getElementById('profile-name').value = currentUser.full_name;
-
-                // Ролевая модель
-                if (currentUser.role === 'operator' || currentUser.role === 'admin') {
-                    document.getElementById('operator-menu').style.display = 'block';
-                }
-                if (currentUser.role === 'admin') {
-                    document.getElementById('admin-menu').style.display = 'block';
-                    loadAdminData();
-                }
-
-                loadPackages();
-            } else {
-                alert("Пожалуйста, откройте через Telegram");
+            // Показ вкладок по ролям
+            if (myUser.role === 'admin') {
+                document.getElementById('admin-btn').classList.remove('d-none');
+                document.getElementById('operator-btn').classList.remove('d-none');
+                // Добавляем форму управления пользователями в админку
+                addAdminPanel(); 
+            } else if (myUser.role === 'operator') {
+                document.getElementById('operator-btn').classList.remove('d-none');
             }
+
+            loadPackages();
+        } catch (e) { alert("Ошибка сервера Render"); }
+    }
+
+    // Кнопка назначения ролей
+    function addAdminPanel() {
+        const adminTab = document.getElementById('admin');
+        const managementHtml = `
+            <div class="card mt-4 p-3 bg-dark text-white">
+                <h6>Управление ролями</h6>
+                <input type="number" id="target-id" class="form-control mb-2" placeholder="Telegram ID">
+                <select id="target-role" class="form-select mb-2">
+                    <option value="operator">Оператор</option>
+                    <option value="admin">Админ</option>
+                    <option value="user">Удалить (User)</option>
+                </select>
+                <button class="btn btn-warning w-100" onclick="updateRole()">Назначить</button>
+            </div>`;
+        adminTab.insertAdjacentHTML('beforeend', managementHtml);
+    }
+
+    async function updateRole() {
+        const tid = document.getElementById('target-id').value;
+        const role = document.getElementById('target-role').value;
+        const res = await fetch(`${API_URL}/api/admin/manage_user`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({admin_id: myUser.tg_id, target_id: tid, role: role})
         });
+        const out = await res.json();
+        alert(out.message);
+    }
 
-        // Навигация
-        function toggleNav() {
-            const sb = document.getElementById("mySidebar");
-            sb.style.width = sb.style.width === "250px" ? "0" : "250px";
-        }
+    // Твои функции интерфейса
+    function openTab(id) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        toggleSidebar();
+    }
+    function toggleSidebar() {
+        const sb = document.getElementById("sidebar");
+        sb.style.width = sb.style.width === "250px" ? "0" : "250px";
+    }
 
-        function showSection(id) {
-            document.querySelectorAll('.section').forEach(el => el.classList.remove('active-section'));
-            document.getElementById(id).classList.add('active-section');
-            toggleNav();
-        }
+    async function loadPackages() {
+        const res = await fetch(`${API_URL}/api/packages/${myUser.tg_id}`);
+        const data = await res.json();
+        document.getElementById('package-list').innerHTML = data.map(p => `
+            <div class="package-card">${p.tracking_number} - ${p.status}</div>
+        `).join('');
+    }
 
-        // Функции клиента
-        async function saveProfile() {
-            const newName = document.getElementById('profile-name').value;
-            await fetch('/api/profile/update', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({tg_id: currentUser.tg_id, full_name: newName})
-            });
-            alert('Сохранено!');
-        }
-
-        async function loadPackages() {
-            const res = await fetch(`/api/packages/${currentUser.tg_id}`);
-            const data = await res.json();
-            const list = document.getElementById('packages-list');
-            list.innerHTML = '';
-            
-            data.forEach(pkg => {
-                const el = document.createElement('div');
-                el.className = 'card-custom p-3 d-flex justify-content-between align-items-center';
-                el.innerHTML = `
-                    <div>
-                        <div class="fw-bold">${pkg.tracking_number}</div>
-                        <div class="small text-muted">${pkg.location} • ${pkg.weight} кг</div>
-                    </div>
-                    <div class="text-end">
-                        <div class="fw-bold text-success">${pkg.cost} руб</div>
-                        <span class="status-badge">${pkg.status}</span>
-                    </div>
-                `;
-                list.appendChild(el);
-            });
-        }
-
-        // Функции оператора
-        async function submitWeight() {
-            const userCode = document.getElementById('op-user-code').value;
-            const weight = parseFloat(document.getElementById('op-weight').value);
-            
-            const res = await fetch('/api/operator/weigh', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({user_code: userCode, weight: weight})
-            });
-            const data = await res.json();
-            
-            document.getElementById('weigh-result').innerText = `Готово! Стоимость: ${data.cost} руб`;
-        }
-
-        // Функции админа
-        async function loadAdminData() {
-            const res = await fetch('/api/admin/payment');
-            const data = await res.json();
-            document.getElementById('admin-payment-text').value = data.text;
-        }
-
-        async function savePaymentText() {
-            const text = document.getElementById('admin-payment-text').value;
-            await fetch('/api/admin/payment', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({text: text})
-            });
-            alert('Текст оплаты обновлен!');
-        }
-    </script>
-</body>
-</html>
+    init();
+</script>
