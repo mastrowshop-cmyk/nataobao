@@ -14,7 +14,7 @@ users_table = db.table('users')
 User = Query()
 
 # ТВОЙ ID (замени на свой!)
-OWNER_ID = 123456789 
+OWNER_ID = 7668402802 
 
 TOKEN = os.getenv("BOT_TOKEN")
 WEB_APP_URL = "https://mastrowshop-cmyk.github.io/nataobao/"
